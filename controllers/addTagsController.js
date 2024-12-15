@@ -1,13 +1,13 @@
-const {validateTagList} = require('../validation/photo')
-const {validateRequestBody} = require('../validation/tag')
-const {Tag } = require('../models');
+const { validateTagList } = require('../validation/photo')
+const { validateRequestBody } = require('../validation/tag')
+const { Tag, Photo } = require('../models');
 const { doesPhotoExistById } = require('../utils/photo');
 
 
 const addTagsController = async (req, res) => {
     try {
         const photoId = parseInt(req.params.photoId);
-        const {tags} = req.body
+        const { tags } = req.body
 
         let errors = [];
         errors.push(...validateRequestBody(req.body, photoId));
@@ -20,7 +20,7 @@ const addTagsController = async (req, res) => {
         // check existing tags and body tags are not same 
         const existingTags = photo.photoTags ? photo.photoTags.map((tag) => tag.name) : [];
 
-        const newTags = tags ? tags.filter((tag)=> !existingTags.includes(tag)): []
+        const newTags = tags ? tags.filter((tag) => !existingTags.includes(tag)) : []
 
         // chcek the new updated tagList validation
         errors.push(...validateTagList(existingTags.concat(newTags)))
@@ -34,7 +34,12 @@ const addTagsController = async (req, res) => {
             name: tag,
             photoId: photo.id,
         }));
-        await Tag.bulkCreate(addedTags); 
+        await Tag.bulkCreate(addedTags);
+        const updatedTagList = existingTags.concat(newTags);
+        await Photo.update(
+            { tagList: updatedTagList },
+            { where: { id: photoId } }
+        );
 
 
         res.status(201).json({
