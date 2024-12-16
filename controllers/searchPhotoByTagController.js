@@ -2,8 +2,8 @@ const { validateTag } = require('../validation/tag')
 const { validateSortingOrder } = require('../validation/sorting')
 const { doesUserExistById } = require('../utils/user')
 const { doesTagExistByName } = require('../utils/tag')
-const {sequelize, Tag, Photo } = require('../models')
-
+const { sequelize, Tag, Photo } = require('../models')
+const { validateRequestBody } = require('../validation/searchHistory')
 
 const SearchHistory = sequelize.models.serachHistories;
 
@@ -91,4 +91,51 @@ const searchPhotoByTag = async (req, res) => {
     }
 }
 
-module.exports = { searchPhotoByTag };
+const fetchSearchHistoryOfUser = async (request, res) => {
+    try {
+        const userId = parseInt(request.query.userId);
+
+        let errors = [];
+
+        errors.push(...validateRequestBody(userId));
+
+        if (errors.length > 0) {
+            return res.status(400).json({ errors });
+        }
+
+        // if userid present then find the user and update the query into user's search history
+        const userExists = await doesUserExistById(parseInt(userId));
+        if (!userExists) {
+            return res.status(404).json({ errors: [{ msg: "User not found" }] })
+        }
+
+        // fetch search histories of that user
+        const searchHistories = await SearchHistory.findAll({
+            where:{
+                userId: userId
+            },
+            order: [['timestamp', 'DESC']]
+        })
+
+        return res.status(200).json({
+            user: userExists,
+            searchHistory: searchHistories.map((history) => ({
+                id: history.id,
+                query: history.query,
+                timestamp: history.timestamp,
+            }))
+        });
+
+
+    } catch (err) {
+        console.error(err);
+
+        if (err.message.includes("Error checking user existence")) {
+            return res.status(500).json({ errors: [{ msg: "Server error when finding user" }] })
+        }
+
+        res.status(500).json({ message: "Internal Server Error" });
+    }
+}
+
+module.exports = { searchPhotoByTag, fetchSearchHistoryOfUser };
